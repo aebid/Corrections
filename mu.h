@@ -16,12 +16,12 @@ public:
         NUM_LooseID_DEN_genTracks = 4,
         NUM_LooseID_DEN_TrackerMuons = 5,
         NUM_LooseRelIso_DEN_LooseID = 6,
-        NUM_LooseRelIso_DEN_mediumID = 7,
+        NUM_LooseRelIso_DEN_MediumID = 7,
         NUM_LooseRelIso_DEN_MediumPromptID = 8,
         NUM_LooseRelIso_DEN_TightIDandIPCut = 9,
         NUM_LooseRelTkIso_DEN_HighPtIDandIPCut = 10,
         NUM_LooseRelTkIso_DEN_TrkHighPtIDandIPCut = 11,
-        NUM_mediumID_DEN_genTracks = 12,
+        NUM_MediumID_DEN_genTracks = 12,
         NUM_MediumID_DEN_TrackerMuons = 13,
         NUM_MediumPromptID_DEN_genTracks = 14,
         NUM_MediumPromptID_DEN_TrackerMuons = 15,
@@ -30,7 +30,7 @@ public:
         NUM_SoftID_DEN_TrackerMuons = 18,
         NUM_TightID_DEN_genTracks = 19,
         NUM_TightID_DEN_TrackerMuons = 20,
-        NUM_TightRelIso_DEN_mediumID = 21,
+        NUM_TightRelIso_DEN_MediumID = 21,
         NUM_TightRelIso_DEN_MediumPromptID = 22,
         NUM_TightRelIso_DEN_TightIDandIPCut = 23,
         NUM_TightRelTkIso_DEN_HighPtIDandIPCut = 24,
@@ -59,8 +59,6 @@ public:
         return names;
     };
 
-
-
     static const std::string& getScaleStr(UncScale scale)
     {
         static const std::map<UncScale, std::string> names = {
@@ -71,11 +69,13 @@ public:
         return names.at(scale);
     }
 
-     static bool sourceApplies(UncSource source, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float muon_Pt, const float Muon_tkRelIso, const bool Muon_highPtId)
+     static bool sourceApplies(UncSource source, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float muon_Pt, const float Muon_tkRelIso, const bool Muon_highPtId, const bool Muon_MediumId)
     {
         // RECO
         if(source == UncSource::NUM_TrackerMuons_DEN_genTracks) return true;
         // ID
+        if(source == UncSource::NUM_MediumID_DEN_genTracks && Muon_MediumId ) return true;
+        if(source == UncSource::NUM_MediumID_DEN_TrackerMuons && Muon_MediumId ) return true;
         if(source == UncSource::NUM_TightID_DEN_TrackerMuons && Muon_TightId ) return true;
         if(source == UncSource::NUM_TightID_DEN_genTracks && Muon_TightId ) return true;
         if(source == UncSource::NUM_HighPtID_DEN_TrackerMuons && Muon_highPtId ) return true;
@@ -84,6 +84,8 @@ public:
         // ISO
         bool tightIDandIP_condition = (Muon_TightId && Muon_pfRelIso04_all<0.15);
         bool highPtIDandIP_condition = (Muon_highPtId && Muon_tkRelIso < 0.15);
+        // bool MediumIdandLoosePFIso_condition = (Muon_MediumId && Muon_pfRelIso04_all < 0.25);
+        if(source == UncSource::NUM_LoosePFIso_DEN_MediumID && Muon_MediumId ) return true;
         if(source == UncSource::NUM_TightRelIso_DEN_TightIDandIPCut && tightIDandIP_condition ) return true;
         if(source == UncSource::NUM_TightRelTkIso_DEN_TrkHighPtIDandIPCut && highPtIDandIP_condition ) return true;
         // }
@@ -95,14 +97,14 @@ public:
         return false;
     }
 
-    static bool sourceAppliesMedium(UncSource source, const float Muon_pfRelIso04_all, const float muon_Pt, const bool Muon_mediumID){
-        bool mediumID_condition = (Muon_mediumID ); //Since there is not an ISO, should we remove this pfRelIso?
-        bool looseIso_condition = (Muon_pfRelIso04_all<0.25);
-        if(source == UncSource::NUM_MediumID_DEN_TrackerMuons && mediumID_condition ) return true;
-        if(source == UncSource::NUM_LoosePFIso_DEN_MediumID && mediumID_condition ) return true;
-        return false;
+    // static bool sourceAppliesMedium(UncSource source, const float Muon_pfRelIso04_all, const float muon_Pt, const bool Muon_MediumId){
+    //     bool MediumID_condition = (Muon_MediumId ); //Since there is not an ISO, should we remove this pfRelIso?
+    //     bool looseIso_condition = (Muon_pfRelIso04_all<0.25);
+    //     if(source == UncSource::NUM_MediumID_DEN_TrackerMuons && MediumID_condition ) return true;
+    //     if(source == UncSource::NUM_LoosePFIso_DEN_MediumID && MediumID_condition ) return true;
+    //     return false;
 
-    }
+    // }
 
 
     MuCorrProvider(const std::string& fileName, const std::string& era) :
@@ -139,7 +141,6 @@ public:
         if ((era == "Run2_2016_HIPM") || (era == "Run2_2016")){
             muIDCorrections["NUM_IsoMu24_or_IsoTkMu24_DEN_CutBasedIdTight_and_PFIsoTight"] = corrections_->at("NUM_IsoMu24_or_IsoTkMu24_DEN_CutBasedIdTight_and_PFIsoTight");
         }
-
         if (era == "Run3_2022" || era == "Run3_2022EE" || era == "Run3_2023" || era == "Run3_2023BPix"){
             muIDCorrections["NUM_TightID_DEN_TrackerMuons"]=corrections_->at("NUM_TightID_DEN_TrackerMuons");
             muIDCorrections["NUM_LoosePFIso_DEN_TightID"]=corrections_->at("NUM_LoosePFIso_DEN_TightID");
@@ -151,14 +152,14 @@ public:
 
         }
     }
-    float getMuonSFMedium(const LorentzVectorM & muon_p4, const float Muon_pfRelIso04_all, const bool Muon_mediumID, UncSource source, UncScale scale) const {
-        const UncScale muID_scale = sourceAppliesMedium(source, Muon_pfRelIso04_all,  muon_p4.Pt(), Muon_mediumID) ? scale : UncScale::Central;
-        const std::string& scale_str = getScaleStr(muID_scale);
-        return source == UncSource::Central ? 1. : muIDCorrections.at(getUncSourceName(source))->evaluate({abs(muon_p4.Eta()),muon_p4.Pt(), scale_str}) ;
-    }
+    // float getMuonSFMedium(const LorentzVectorM & muon_p4, const float Muon_pfRelIso04_all, const bool Muon_MediumId, UncSource source, UncScale scale) const {
+    //     const UncScale muID_scale = sourceAppliesMedium(source, Muon_pfRelIso04_all,  muon_p4.Pt(), Muon_MediumId) ? scale : UncScale::Central;
+    //     const std::string& scale_str = getScaleStr(muID_scale);
+    //     return source == UncSource::Central ? 1. : muIDCorrections.at(getUncSourceName(source))->evaluate({abs(muon_p4.Eta()),muon_p4.Pt(), scale_str}) ;
+    // }
 
-    float getMuonSF(const LorentzVectorM & muon_p4, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float Muon_tkRelIso, const bool Muon_highPtId, UncSource source, UncScale scale) const {
-        const UncScale muID_scale = sourceApplies(source, Muon_pfRelIso04_all, Muon_TightId, muon_p4.Pt(), Muon_tkRelIso, Muon_highPtId) ? scale : UncScale::Central;
+    float getMuonSF(const LorentzVectorM & muon_p4, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float Muon_tkRelIso, const bool Muon_highPtId, const bool Muon_MediumId, UncSource source, UncScale scale) const {
+        const UncScale muID_scale = sourceApplies(source, Muon_pfRelIso04_all, Muon_TightId, muon_p4.Pt(), Muon_tkRelIso, Muon_highPtId, Muon_MediumId) ? scale : UncScale::Central;
         const std::string& scale_str = getScaleStr(muID_scale);
         if (source == UncSource::NUM_TrackerMuons_DEN_genTracks) {
             //const std::string& reco_scale_str = scale==UncScale::Central ? "nominal" : scale_str;
@@ -197,12 +198,12 @@ private:
         if (source == UncSource::NUM_LooseID_DEN_genTracks) k = "NUM_LooseID_DEN_genTracks";
         if (source == UncSource::NUM_LooseID_DEN_TrackerMuons) k = "NUM_LooseID_DEN_TrackerMuons";
         if (source == UncSource::NUM_LooseRelIso_DEN_LooseID) k = "NUM_LooseRelIso_DEN_LooseID";
-        if (source == UncSource::NUM_LooseRelIso_DEN_mediumID) k = "NUM_LooseRelIso_DEN_mediumID";
+        if (source == UncSource::NUM_LooseRelIso_DEN_MediumID) k = "NUM_LooseRelIso_DEN_MediumID";
         if (source == UncSource::NUM_LooseRelIso_DEN_MediumPromptID) k = "NUM_LooseRelIso_DEN_MediumPromptID";
         if (source == UncSource::NUM_LooseRelIso_DEN_TightIDandIPCut) k = "NUM_LooseRelIso_DEN_TightIDandIPCut";
         if (source == UncSource::NUM_LooseRelTkIso_DEN_HighPtIDandIPCut) k = "NUM_LooseRelTkIso_DEN_HighPtIDandIPCut";
         if (source == UncSource::NUM_LooseRelTkIso_DEN_TrkHighPtIDandIPCut) k = "NUM_LooseRelTkIso_DEN_TrkHighPtIDandIPCut";
-        if (source == UncSource::NUM_mediumID_DEN_genTracks) k = "NUM_mediumID_DEN_genTracks";
+        if (source == UncSource::NUM_MediumID_DEN_genTracks) k = "NUM_MediumID_DEN_genTracks";
         if (source == UncSource::NUM_MediumID_DEN_TrackerMuons) k = "NUM_MediumID_DEN_TrackerMuons";
         if (source == UncSource::NUM_LoosePFIso_DEN_MediumID) k = "NUM_LoosePFIso_DEN_MediumID";
         if (source == UncSource::NUM_MediumPromptID_DEN_genTracks) k = "NUM_MediumPromptID_DEN_genTracks";
@@ -212,7 +213,7 @@ private:
         if (source == UncSource::NUM_SoftID_DEN_TrackerMuons) k = "NUM_SoftID_DEN_TrackerMuons";
         if (source == UncSource::NUM_TightID_DEN_genTracks) k = "NUM_TightID_DEN_genTracks";
         if (source == UncSource::NUM_TightID_DEN_TrackerMuons) k = "NUM_TightID_DEN_TrackerMuons";
-        if (source == UncSource::NUM_TightRelIso_DEN_mediumID) k = "NUM_TightRelIso_DEN_mediumID";
+        if (source == UncSource::NUM_TightRelIso_DEN_MediumID) k = "NUM_TightRelIso_DEN_MediumID";
         if (source == UncSource::NUM_TightRelIso_DEN_MediumPromptID) k = "NUM_TightRelIso_DEN_MediumPromptID";
         if (source == UncSource::NUM_TightRelIso_DEN_TightIDandIPCut) k = "NUM_TightRelIso_DEN_TightIDandIPCut";
         if (source == UncSource::NUM_TightRelTkIso_DEN_HighPtIDandIPCut) k = "NUM_TightRelTkIso_DEN_HighPtIDandIPCut";
@@ -230,7 +231,6 @@ private:
 };
 
 
-
 class HighPtMuCorrProvider : public CorrectionsBase<HighPtMuCorrProvider> {
 public:
     enum class UncSource : int {
@@ -243,15 +243,15 @@ public:
         NUM_probe_LooseRelTkIso_DEN_TrkHighPtProbes = 5,
         NUM_probe_TightRelTkIso_DEN_TrkHighPtProbes = 6,
         NUM_TightID_DEN_GlobalMuonProbes = 7,
-        NUM_mediumID_DEN_GlobalMuonProbes = 8,
-        NUM_probe_LooseRelTkIso_DEN_mediumIDProbes = 9,
-        NUM_probe_TightRelTkIso_DEN_mediumIDProbes = 10,
+        NUM_MediumID_DEN_GlobalMuonProbes = 8,
+        NUM_probe_LooseRelTkIso_DEN_MediumIDProbes = 9,
+        NUM_probe_TightRelTkIso_DEN_MediumIDProbes = 10,
         NUM_HLT_DEN_TrkHighPtTightRelIsoProbes = 11,
         NUM_HLT_DEN_TrkHighPtLooseRelIsoProbes = 12,
         NUM_HLT_DEN_HighPtTightRelIsoProbes = 13,
         NUM_HLT_DEN_HighPtLooseRelIsoProbes = 14,
-        NUM_HLT_DEN_mediumIDTightRelIsoProbes = 15,
-        NUM_HLT_DEN_mediumIDLooseRelIsoProbes = 16
+        NUM_HLT_DEN_MediumIDTightRelIsoProbes = 15,
+        NUM_HLT_DEN_MediumIDLooseRelIsoProbes = 16
     };
 
     static const std::string& getScaleStr(UncScale scale)
@@ -264,17 +264,19 @@ public:
         return names.at(scale);
     }
 
-
-     static bool sourceApplies(UncSource source, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float muon_Pt, const float Muon_tkRelIso, const bool Muon_highPtId)
+     static bool sourceApplies(UncSource source, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float muon_Pt, const float Muon_tkRelIso, const bool Muon_highPtId,const bool Muon_MediumPtId)
     {
         // RECO
         if (source == UncSource::NUM_GlobalMuons_DEN_TrackerMuonProbes) return true;
         // ID
         if(source == UncSource::NUM_TightID_DEN_GlobalMuonProbes && Muon_TightId ) return true;
         if(source == UncSource::NUM_HighPtID_DEN_GlobalMuonProbes && Muon_highPtId ) return true;
+        if(source == UncSource::NUM_MediumID_DEN_GlobalMuonProbes && Muon_MediumPtId ) return true;
+        if(source == UncSource::NUM_HLT_DEN_MediumIDLooseRelIsoProbes && (Muon_MediumPtId && Muon_pfRelIso04_all < 0.25 ) ) return true;
         // ISO
         bool highPtID_condition = (Muon_highPtId && Muon_tkRelIso < 0.15);
         if (source == UncSource::NUM_probe_TightRelTkIso_DEN_HighPtProbes && highPtID_condition ) return true;
+        if (source == UncSource::NUM_probe_LooseRelTkIso_DEN_MediumIDProbes && Muon_MediumPtId && Muon_tkRelIso < 0.25) return true;
         return false;
     }
 
@@ -284,13 +286,16 @@ public:
         highPtmuCorrections["NUM_GlobalMuons_DEN_TrackerMuonProbes"]=corrections_->at("NUM_GlobalMuons_DEN_TrackerMuonProbes");
         highPtmuCorrections["NUM_TightID_DEN_GlobalMuonProbes"]=corrections_->at("NUM_TightID_DEN_GlobalMuonProbes");
         highPtmuCorrections["NUM_HighPtID_DEN_GlobalMuonProbes"]=corrections_->at("NUM_HighPtID_DEN_GlobalMuonProbes");
+        highPtmuCorrections["NUM_MediumID_DEN_GlobalMuonProbes"]=corrections_->at("NUM_MediumID_DEN_GlobalMuonProbes");
+        highPtmuCorrections["NUM_HLT_DEN_MediumIDLooseRelIsoProbes"]=corrections_->at("NUM_HLT_DEN_MediumIDLooseRelIsoProbes");
         highPtmuCorrections["NUM_probe_TightRelTkIso_DEN_HighPtProbes"]=corrections_->at("NUM_probe_TightRelTkIso_DEN_HighPtProbes");
+        highPtmuCorrections["NUM_probe_LooseRelTkIso_DEN_MediumIDProbes"]=corrections_->at("NUM_probe_LooseRelTkIso_DEN_MediumIDProbes");
 
     }
 
-    float getHighPtMuonSF(const LorentzVectorM & muon_p4, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float Muon_tkRelIso, const bool Muon_highPtId, UncSource source, UncScale scale) const {
+    float getHighPtMuonSF(const LorentzVectorM & muon_p4, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float Muon_tkRelIso, const bool Muon_highPtId, const bool Muon_MediumPtId, UncSource source, UncScale scale) const {
 
-        const UncScale muID_scale = sourceApplies(source, Muon_pfRelIso04_all, Muon_TightId, muon_p4.Pt(), Muon_tkRelIso, Muon_highPtId) ? scale : UncScale::Central;
+        const UncScale muID_scale = sourceApplies(source, Muon_pfRelIso04_all, Muon_TightId, muon_p4.Pt(), Muon_tkRelIso, Muon_highPtId, Muon_MediumPtId) ? scale : UncScale::Central;
         const std::string& scale_str = getScaleStr(muID_scale);
         const auto mu_p = std::hypot(muon_p4.Px(),muon_p4.Py(),muon_p4.Pz());
         if (source == UncSource::NUM_GlobalMuons_DEN_TrackerMuonProbes) {
@@ -314,15 +319,15 @@ private:
         if (source == UncSource::NUM_probe_LooseRelTkIso_DEN_TrkHighPtProbes) sourcename =  "NUM_probe_LooseRelTkIso_DEN_TrkHighPtProbes";
         if (source == UncSource::NUM_probe_TightRelTkIso_DEN_TrkHighPtProbes) sourcename =  "NUM_probe_TightRelTkIso_DEN_TrkHighPtProbes";
         if (source == UncSource::NUM_TightID_DEN_GlobalMuonProbes) sourcename =  "NUM_TightID_DEN_GlobalMuonProbes";
-        if (source == UncSource::NUM_mediumID_DEN_GlobalMuonProbes) sourcename =  "NUM_mediumID_DEN_GlobalMuonProbes";
-        if (source == UncSource::NUM_probe_LooseRelTkIso_DEN_mediumIDProbes) sourcename =  "NUM_probe_LooseRelTkIso_DEN_mediumIDProbes";
-        if (source == UncSource::NUM_probe_TightRelTkIso_DEN_mediumIDProbes) sourcename =  "NUM_probe_TightRelTkIso_DEN_mediumIDProbes";
+        if (source == UncSource::NUM_MediumID_DEN_GlobalMuonProbes) sourcename =  "NUM_MediumID_DEN_GlobalMuonProbes";
+        if (source == UncSource::NUM_probe_LooseRelTkIso_DEN_MediumIDProbes) sourcename =  "NUM_probe_LooseRelTkIso_DEN_MediumIDProbes";
+        if (source == UncSource::NUM_probe_TightRelTkIso_DEN_MediumIDProbes) sourcename =  "NUM_probe_TightRelTkIso_DEN_MediumIDProbes";
         if (source == UncSource::NUM_HLT_DEN_TrkHighPtTightRelIsoProbes) sourcename =  "NUM_HLT_DEN_TrkHighPtTightRelIsoProbes";
         if (source == UncSource::NUM_HLT_DEN_TrkHighPtLooseRelIsoProbes) sourcename =  "NUM_HLT_DEN_TrkHighPtLooseRelIsoProbes";
         if (source == UncSource::NUM_HLT_DEN_HighPtTightRelIsoProbes) sourcename =  "NUM_HLT_DEN_HighPtTightRelIsoProbes";
         if (source == UncSource::NUM_HLT_DEN_HighPtLooseRelIsoProbes) sourcename =  "NUM_HLT_DEN_HighPtLooseRelIsoProbes";
-        if (source == UncSource::NUM_HLT_DEN_mediumIDTightRelIsoProbes) sourcename =  "NUM_HLT_DEN_mediumIDTightRelIsoProbes";
-        if (source == UncSource::NUM_HLT_DEN_mediumIDLooseRelIsoProbes) sourcename =  "NUM_HLT_DEN_mediumIDLooseRelIsoProbes";
+        if (source == UncSource::NUM_HLT_DEN_MediumIDTightRelIsoProbes) sourcename =  "NUM_HLT_DEN_MediumIDTightRelIsoProbes";
+        if (source == UncSource::NUM_HLT_DEN_MediumIDLooseRelIsoProbes) sourcename =  "NUM_HLT_DEN_MediumIDLooseRelIsoProbes";
         return sourcename;
     }
 private:
@@ -354,11 +359,12 @@ public:
     }
 
     //We can probably remove this highPtId bool, or maybe we will have to invent a lowPtId
-    static bool sourceApplies(UncSource source, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float muon_Pt, const float Muon_tkRelIso, const bool Muon_highPtId)
+    static bool sourceApplies(UncSource source, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float muon_Pt, const float Muon_tkRelIso, const bool Muon_highPtId, const bool Muon_MediumId)
     {
         // ID
         bool tightID_condition = (Muon_TightId && Muon_pfRelIso04_all<0.15); //Since there is not an ISO, should we remove this pfRelIso?
         if(source == UncSource::NUM_TightID_DEN_TrackerMuons && tightID_condition ) return true;
+        if(source == UncSource::NUM_MediumID_DEN_TrackerMuons && Muon_MediumId ) return true;
         return false;
     }
 
@@ -366,9 +372,11 @@ public:
     corrections_(CorrectionSet::from_file(fileName))
     {
         lowPtmuCorrections["NUM_TightID_DEN_TrackerMuons"]=corrections_->at("NUM_TightID_DEN_TrackerMuons");
+        lowPtmuCorrections["NUM_MediumID_DEN_TrackerMuons"]=corrections_->at("NUM_MediumID_DEN_TrackerMuons");
+
     }
-    float getLowPtMuonSF(const LorentzVectorM & muon_p4, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float Muon_tkRelIso, const bool Muon_highPtId, UncSource source, UncScale scale) const {
-        const UncScale muID_scale = sourceApplies(source, Muon_pfRelIso04_all, Muon_TightId, muon_p4.Pt(), Muon_tkRelIso, Muon_highPtId) ? scale : UncScale::Central;
+    float getLowPtMuonSF(const LorentzVectorM & muon_p4, const float Muon_pfRelIso04_all, const bool Muon_TightId, const float Muon_tkRelIso, const bool Muon_highPtId, const bool Muon_MediumId, UncSource source, UncScale scale) const {
+        const UncScale muID_scale = sourceApplies(source, Muon_pfRelIso04_all, Muon_TightId, muon_p4.Pt(), Muon_tkRelIso, Muon_highPtId, Muon_MediumId) ? scale : UncScale::Central;
         const std::string& scale_str = getScaleStr(muID_scale);
         return source == UncSource::Central ? 1. : lowPtmuCorrections.at(getUncSourceName(source))->evaluate({abs(muon_p4.Eta()),muon_p4.Pt(), scale_str}) ;
     }

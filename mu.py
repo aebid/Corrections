@@ -31,10 +31,13 @@ class MuCorrProducer:
         # reco SF
         "NUM_GlobalMuons_DEN_TrackerMuonProbes":"Reco", # --> This is the recommended one for RECO!!
         # ID SF - with tracker muons - RECOMMENDED
+        "NUM_MediumID_DEN_GlobalMuonProbes": "MediumID",
+        "NUM_HLT_DEN_MediumIDLooseRelIsoProbes":"MediumIDLooseRelIsoHLT",
         "NUM_TightID_DEN_GlobalMuonProbes": "TightID",
         "NUM_HighPtID_DEN_GlobalMuonProbes": "HighPtID",
         # Iso SF
         "NUM_probe_TightRelTkIso_DEN_HighPtProbes": "HighPtIdRelTkIso",
+        "NUM_probe_LooseRelTkIso_DEN_MediumIDProbes":"MediumIdLooseRelTkIso"
 
     }
 
@@ -42,7 +45,6 @@ class MuCorrProducer:
     muID_SF_Sources_dict = {
         # reco SF
         "NUM_TrackerMuons_DEN_genTracks":"Reco", # --> This is the recommended one for RECO!!
-
         # # ID SF - with genTracks - NOT RECOMMENDED --> WE DO NOT USE THIS
         # "NUM_MediumPromptID_DEN_genTracks":"MediumID", # medium ID
         # "NUM_TightID_DEN_genTracks":"TightID", # tight ID
@@ -50,12 +52,14 @@ class MuCorrProducer:
 
         # ID SF - with tracker muons - RECOMMENDED
         # "NUM_MediumPromptID_DEN_TrackerMuons":"Medium_promptID_Trk",
+        "NUM_MediumID_DEN_genTracks":"Reco_MediumID_genTrk",
         "NUM_MediumID_DEN_TrackerMuons": "MediumID_Trk", # medium ID
         "NUM_TightID_DEN_TrackerMuons":"TightID_Trk", # tight ID
         "NUM_HighPtID_DEN_TrackerMuons": "HighPtID_Trk",# HighPtID ID
 
         # Iso SF
-        "NUM_LoosePFIso_DEN_MediumID":"MediumIDLooseIso", # medium ID, loose  iso
+        "NUM_LoosePFIso_DEN_MediumID":"MediumIDLoosePFIso", # medium ID, loose  iso
+        "NUM_LooseRelIso_DEN_MediumID":"MediumIDLooseRelIso",
         "NUM_TightRelIso_DEN_MediumPromptID":"MediumRelIso", # medium ID, tight iso
         "NUM_TightRelIso_DEN_TightIDandIPCut":"TightRelIso", # tight ID, tight iso
         "NUM_TightRelTkIso_DEN_TrkHighPtIDandIPCut" :"HighPtIdRelTkIso",  # highPtID, tight tkRelIso
@@ -97,7 +101,6 @@ class MuCorrProducer:
         "2018_UL": ["NUM_TightID_DEN_TrackerMuons"],
         "2022_Summer22": ["NUM_TightID_DEN_TrackerMuons","NUM_MediumID_DEN_TrackerMuons"],
         "2022_Summer22EE": ["NUM_TightID_DEN_TrackerMuons","NUM_MediumID_DEN_TrackerMuons"],
-        "2023_Summer23": ["NUM_TightID_DEN_TrackerMuons"],
         "2023_Summer23": ["NUM_TightID_DEN_TrackerMuons","NUM_MediumID_DEN_TrackerMuons"],
         "2023_Summer23BPix": ["NUM_TightID_DEN_TrackerMuons","NUM_MediumID_DEN_TrackerMuons"],
         }
@@ -112,10 +115,10 @@ class MuCorrProducer:
         "2023_Summer23BPix": ["NUM_LoosePFIso_DEN_TightID", "NUM_LoosePFIso_DEN_MediumID"],
         }
 
-    # for high pt id
+    # for high pt muons
     highPtmuReco_SF_sources = ["NUM_GlobalMuons_DEN_TrackerMuonProbes"]
-    highPtmuID_SF_Sources = ["NUM_TightID_DEN_GlobalMuonProbes", "NUM_HighPtID_DEN_GlobalMuonProbes"]
-    highPtmuIso_SF_Sources = ["NUM_probe_TightRelTkIso_DEN_HighPtProbes"] # not find the tightID with tight PF iso
+    highPtmuID_SF_Sources = ["NUM_TightID_DEN_GlobalMuonProbes", "NUM_HighPtID_DEN_GlobalMuonProbes", "NUM_MediumID_DEN_GlobalMuonProbes","NUM_HLT_DEN_MediumIDLooseRelIsoProbes"]
+    highPtmuIso_SF_Sources = ["NUM_probe_TightRelTkIso_DEN_HighPtProbes", "NUM_probe_LooseRelTkIso_DEN_MediumIDProbes"] # not find the tightID with tight PF iso # not sure if using loose tk rel iso for medium ID but I prefer to save them
 
     # NUM_LoosePFIso_DEN_MediumID
     # NUM_TightPFIso_DEN_MediumID
@@ -124,7 +127,7 @@ class MuCorrProducer:
     # NUM_TightMiniIso_DEN_MediumID
     # for low pt id
     lowPtmuReco_SF_sources = []
-    lowPtmuID_SF_Sources = ["NUM_TightID_DEN_TrackerMuons"]
+    lowPtmuID_SF_Sources = ["NUM_TightID_DEN_TrackerMuons", "NUM_MediumID_DEN_TrackerMuons"]
     lowPtmuIso_SF_Sources = []
 
 
@@ -176,10 +179,8 @@ class MuCorrProducer:
                     branch_central = f"""weight_{leg_name}_MuonID_SF_{source_name+central}"""
                     genMatch_bool = f"(({leg_name}_gen_kind == 2) || ({leg_name}_gen_kind == 4))"
                     genMatch_bool = f"(({leg_name}_gen_kind == 2) || ({leg_name}_gen_kind == 4))"
-                    if "medium" not in syst_name or "Medium" not in syst_name:
-                        df = df.Define(f"{branch_name}_double",f'''{leg_name}_legType == Leg::mu && {leg_name}_index >= 0 && ({genMatch_bool}) ? ::correction::MuCorrProvider::getGlobal().getMuonSF({leg_name}_p4, Muon_pfRelIso04_all.at({leg_name}_index), Muon_tightId.at({leg_name}_index),Muon_tkRelIso.at({leg_name}_index),Muon_highPtId.at({leg_name}_index),::correction::MuCorrProvider::UncSource::{source}, ::correction::UncScale::{scale}) : 1.''')
-                    else:
-                        df = df.Define(f"{branch_name}_double",f'''{leg_name}_legType == Leg::mu && {leg_name}_index >= 0 && ({genMatch_bool}) ? ::correction::MuCorrProvider::getGlobal().getMuonSFMedium({leg_name}_p4, Muon_pfRelIso04_all.at({leg_name}_index),Muon_mediumId.at({leg_name}_index),::correction::LowPtMMuCorrProvideruCorrProvider::UncSource::{source}, ::correction::UncScale::{scale}) : 1.''')
+
+                    df = df.Define(f"{branch_name}_double",f'''{leg_name}_legType == Leg::mu && {leg_name}_index >= 0 && ({genMatch_bool}) ? ::correction::MuCorrProvider::getGlobal().getMuonSF({leg_name}_p4, Muon_pfRelIso04_all.at({leg_name}_index), Muon_tightId.at({leg_name}_index),Muon_tkRelIso.at({leg_name}_index),Muon_highPtId.at({leg_name}_index),Muon_mediumId.at({leg_name}_index),::correction::MuCorrProvider::UncSource::{source}, ::correction::UncScale::{scale}) : 1.''')
 
                     #Change to this format
                     #df = df.Define(pair_name, vector<val1,val2>)
@@ -218,7 +219,7 @@ class MuCorrProducer:
                     branch_central = f"""weight_{leg_name}_HighPt_MuonID_SF_{source_name+central}"""
                     genMatch_bool = f"(({leg_name}_gen_kind == 2) || ({leg_name}_gen_kind == 4))"
 
-                    df = df.Define(f"{branch_name}_double",f'''{leg_name}_legType == Leg::mu && {leg_name}_index >= 0 && ({genMatch_bool}) ? ::correction::HighPtMuCorrProvider::getGlobal().getHighPtMuonSF({leg_name}_p4, Muon_pfRelIso04_all.at({leg_name}_index), Muon_tightId.at({leg_name}_index), Muon_highPtId.at({leg_name}_index), Muon_tkRelIso.at({leg_name}_index),::correction::HighPtMuCorrProvider::UncSource::{source}, ::correction::UncScale::{scale}) : 1.''')
+                    df = df.Define(f"{branch_name}_double",f'''{leg_name}_legType == Leg::mu && {leg_name}_index >= 0 && ({genMatch_bool}) ? ::correction::HighPtMuCorrProvider::getGlobal().getHighPtMuonSF({leg_name}_p4, Muon_pfRelIso04_all.at({leg_name}_index), Muon_tightId.at({leg_name}_index), Muon_highPtId.at({leg_name}_index), Muon_tkRelIso.at({leg_name}_index), Muon_mediumId.at({leg_name}_index),::correction::HighPtMuCorrProvider::UncSource::{source}, ::correction::UncScale::{scale}) : 1.''')
 
                     if scale != central:
                         branch_name_final = branch_name + '_rel'
@@ -252,7 +253,7 @@ class MuCorrProducer:
 
                     genMatch_bool = f"(({leg_name}_gen_kind == 2) || ({leg_name}_gen_kind == 4))"
 
-                    df = df.Define(f"{branch_name}_double",f'''{leg_name}_legType == Leg::mu && {leg_name}_index >= 0 && ({genMatch_bool}) ? ::correction::LowPtMuCorrProvider::getGlobal().getLowPtMuonSF({leg_name}_p4, Muon_pfRelIso04_all.at({leg_name}_index), Muon_tightId.at({leg_name}_index), Muon_highPtId.at({leg_name}_index), Muon_tkRelIso.at({leg_name}_index),::correction::LowPtMuCorrProvider::UncSource::{source}, ::correction::UncScale::{scale}) : 1.''')
+                    df = df.Define(f"{branch_name}_double",f'''{leg_name}_legType == Leg::mu && {leg_name}_index >= 0 && ({genMatch_bool}) ? ::correction::LowPtMuCorrProvider::getGlobal().getLowPtMuonSF({leg_name}_p4, Muon_pfRelIso04_all.at({leg_name}_index), Muon_tightId.at({leg_name}_index), Muon_tkRelIso.at({leg_name}_index), Muon_highPtId.at({leg_name}_index), Muon_mediumId.at({leg_name}_index),::correction::LowPtMuCorrProvider::UncSource::{source}, ::correction::UncScale::{scale}) : 1.''')
 
 
                     if scale != central:

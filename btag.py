@@ -114,6 +114,7 @@ class bTagCorrProducer:
         SF_branches = []
         src_list = []
         scale_list = []
+        force_name_as_central = False
         # here list must be corrected
         if isCentral and return_variations:
             src_list = [ central ] + bTagCorrProducer.uncSources_bTagShape_norm
@@ -121,8 +122,9 @@ class bTagCorrProducer:
 
         if not isCentral:
             if IsInJESList(src_name, bTagCorrProducer.uncSources_bTagShape_jes):
-                src_list = [ src_name ]
+                src_list = [ f'jes{src_name}' ] # Right now, src name was 'Total', but should be 'jesTotal'
                 scale_list = [ scale_name ]
+                force_name_as_central = True
             else:
                 src_list = [ central ]
                 scale_list = [ central ]
@@ -135,8 +137,6 @@ class bTagCorrProducer:
             for scale in scale_list:
                 if source == central and scale != central:
                     continue
-                if not isCentral and scale!= central:
-                    continue
                 syst_name = source + scale # if source != central else 'Central'
                 branch_name = f"weight_bTagShape_{syst_name}"
                 branch_central = f"""weight_bTagShape_{source+central}"""
@@ -148,11 +148,11 @@ class bTagCorrProducer:
                     ::correction::UncScale::{scale}
                     ) ''')
 
-                if scale != central:
+                if scale != central and not force_name_as_central : # If jes unc we do not want relative
                         branch_name_final = branch_name + '_rel'
                         df = df.Define(branch_name_final, f"static_cast<float>({branch_name}_double/{branch_central})")
                 else:
-                    if source == central:
+                    if source == central or force_name_as_central: # If jes unc, we want to give the fake name 'weight_btagShape_Central' but this is not actually central, it uses the up/down_jes keys in btagShape
                         branch_name_final = f"""weight_bTagShape_{central}"""
                     else:
                         branch_name_final = branch_name

@@ -77,6 +77,7 @@ class Corrections:
         self.btag_ = None
         self.pu_ = None
         self.mu_ = None
+        self.muScaRe_ = None
         self.ele_ = None
         self.puJetID_ = None
         self.jet_ = None
@@ -141,6 +142,13 @@ class Corrections:
         return self.mu_
 
     @property
+    def muScaRe(self):
+        if self.muScaRe_ is None:
+            from .MuonScaRe_corr import MuonScaReCorrProducer
+            # self.muScaRe_ = MuonScaReCorrProducer(period_names[self.period])
+            self.muScaRe_ = MuonScaReCorrProducer(period_names[self.period], self.isData)
+        return self.muScaRe_
+    @property
     def ele(self):
         if self.ele_ is None:
             from .electron import EleCorrProducer
@@ -174,6 +182,8 @@ class Corrections:
             apply_jes = 'JEC' in self.to_apply and not self.isData
             apply_jer = 'JER' in self.to_apply and not self.isData
             df, source_dict = self.jet.getP4Variations(df, source_dict, apply_jer, apply_jes)
+        if 'muonScaRe' in self.to_apply:
+            df, source_dict = self.muScaRe.getP4Variations(df, source_dict)
             # df, source_dict = self.fatjet.getP4Variations(df, source_dict, 'JER' in self.to_apply, 'JEC' in self.to_apply)
         # if 'tauES' in self.to_apply or 'JEC' in self.to_apply or 'JEC' in self.to_apply:
         #     df, source_dict = self.met.getPFMET(df, source_dict)
