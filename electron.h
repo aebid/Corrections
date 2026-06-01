@@ -68,6 +68,63 @@ namespace correction {
             }
             return value;
         }
+        // https://gitlab.cern.ch/cms-analysis-corrections/EGM/examples/-/blob/latest/egmScaleAndSmearingExample.py?ref_type=heads
+        RVecLV getESEtDep_data(const RVecLV& Electron_p4,
+                     const RVecI& Electron_genMatch,
+                     const RVecUC& Electron_seedGain,
+                     const RVecF& Electron_SCeta,
+                     unsigned int run,
+                     const RVecUC& Electron_r9,
+                     UncSource source,
+                     UncScale scale) const {
+            RVecLV final_p4 = Electron_p4;
+            for (size_t n = 0; n < Electron_p4.size(); ++n) {
+                const GenLeptonMatch genMatch = static_cast<GenLeptonMatch>(Electron_genMatch.at(n));
+                if (scale != UncScale::Central &&
+                    (genMatch == GenLeptonMatch::Electron || genMatch == GenLeptonMatch::TauElectron)) {
+                    double sf = Electron_p4[n].pt() < 15 ? 0. : correctionsES_->compound().at("Scale")->evaluate({"scale",  // or SmearAndSyst ??? and smear?
+                                                static_cast<double>(run),
+                                                Electron_SCeta[n],
+                                                static_cast<double>(Electron_r9.at(n)),
+                                                Electron_p4[n].pt(),
+                                                Electron_seedGain.at(n)});
+                    final_p4[n] *= 1 + static_cast<int>(scale) * sf;
+                }
+            }
+            return final_p4;
+        }
+
+        RVecLV getESEtDep_MC(const RVecLV& Electron_p4,
+                     const RVecI& Electron_genMatch,
+                     const RVecUC& Electron_seedGain,
+                     const RVecF& Electron_SCeta,
+                     unsigned int run,
+                     const RVecUC& Electron_r9,
+                     UncSource source,
+                     UncScale scale) const {
+            TRandom3 rng(0);
+            RVecLV final_p4 = Electron_p4;
+            for (size_t n = 0; n < Electron_p4.size(); ++n) {
+                const GenLeptonMatch genMatch = static_cast<GenLeptonMatch>(Electron_genMatch.at(n));
+                if (scale != UncScale::Central &&
+                    (genMatch == GenLeptonMatch::Electron || genMatch == GenLeptonMatch::TauElectron)) {
+                    double smear = Electron_p4[n].pt() < 15 ? 0. : EleES_->evaluate({"smear",  // or SmearAndSyst ??? and smear?
+                                                // static_cast<double>(run),
+                                                Electron_p4[n].pt(),
+                                                static_cast<double>(Electron_r9.at(n)),
+                                                Electron_SCeta[n]});
+                    const double random_number = rng.Gaus(0.0, 1.0);
+                    const double sf = 1.0 + static_cast<int>(scale) * smear * random_number;
+
+                    final_p4[n] = LorentzVectorM(Electron_p4[n].pt() * sf, Electron_p4[n].eta(),Electron_p4[n].phi(),Electron_p4[n].M());
+                    // const double energyErr_corr = std::sqrt(
+                    //     std::pow(mc_electrons_energyErr[i], 2) +
+                    //     std::pow(mc_electrons_energy[i] * smear, 2)
+                    // ) * smearing;
+                }
+            }
+            return final_p4;
+        }
 
         RVecLV getES(const RVecLV& Electron_p4,
                      const RVecI& Electron_genMatch,

@@ -1,7 +1,10 @@
-#pragma once
+#ifndef CORRECTION_BTAGSHAPECORRPROVIDER_H
+#define CORRECTION_BTAGSHAPECORRPROVIDER_H
 
 #include "corrections.h"
 #include "jet.h"
+
+#include <set>
 
 namespace correction {
     class bTagShapeCorrProvider : public CorrectionsBase<bTagShapeCorrProvider> {
@@ -135,21 +138,30 @@ namespace correction {
             return false;
         }
 
-        bTagShapeCorrProvider(const std::string& fileName, const std::string& year, std::string const& tagger_name)
-            : corrections_(CorrectionSet::from_file(fileName)),
-              shape_corr_(corrections_->at(tagger_name + "_shape")),
-              _year(year) {}
+        bTagShapeCorrProvider(const std::string& fileName,
+                              const std::string& year,
+                              std::string const& tagger_name,
+                              const bool wantShape = true)
+            : corrections_(CorrectionSet::from_file(fileName)), _year(year) {
+            if (wantShape) {
+                shape_corr_ = corrections_->at(tagger_name + "_shape");
+            }
+            std::cerr << "Initialized bTagShapeCorrProvider::bTagShapeCorrProvider()" << std::endl;
+        }
 
         float getBTagShapeSF(const RVecLV& Jet_p4,
-                             const RVecB& pre_sel,
                              const RVecI& Jet_Flavour,
                              const RVecF& Jet_bTag_score,
                              UncSource source,
                              UncScale scale) const {
             double sf_product = 1.;
+            static const std::set<int> allowed_flavors = {0, 4, 5};
             std::string source_str = getUncName().at(source);
-            for (size_t jet_idx = 0; jet_idx < Jet_p4.size(); jet_idx++) {
-                if (!(pre_sel[jet_idx] && Jet_bTag_score[jet_idx] >= 0.0)) {
+            for (size_t jet_idx = 0; jet_idx < Jet_p4.size(); ++jet_idx) {
+                if ((Jet_bTag_score[jet_idx] > 1.0 || Jet_bTag_score[jet_idx] < 0.0) ||
+                    std::abs(Jet_p4[jet_idx].eta()) >= 2.5 || Jet_p4[jet_idx].pt() < 20.0 ||
+                    !allowed_flavors.contains(Jet_Flavour[jet_idx]))
+                {
                     continue;
                 }
                 const UncScale jet_tag_scale = sourceApplies(source, Jet_Flavour[jet_idx]) ? scale : UncScale::Central;
@@ -177,6 +189,12 @@ namespace correction {
                 } catch (...) {
                     std::cerr << "bTagShapeCorrProvider::getBTagShapeSF : Unknown error occurred when evaluating "
                                  "correction\n";
+                    std::cerr << "\tunc_name=" << unc_name << "\n"
+                              << "\tjet_idx=" << jet_idx << "\n"
+                              << "\tJet_Flavour=" << Jet_Flavour[jet_idx] << "\n"
+                              << "\tabs(Jet_eta)=" << std::abs(Jet_p4[jet_idx].eta()) << "\n"
+                              << "\tJet_pt=" << Jet_p4[jet_idx].pt() << "\n"
+                              << "\tJetbtag_score=" << Jet_bTag_score[jet_idx] << "\n";
                     throw;
                 }
             }
@@ -184,10 +202,11 @@ namespace correction {
         }
 
       private:
-      private:
         std::unique_ptr<CorrectionSet> corrections_;
         Correction::Ref shape_corr_;
         std::string _year;
     };
 
 }  //namespace correction
+
+#endif  // CORRECTION_BTAGSHAPECORRPROVIDER_H

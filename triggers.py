@@ -55,7 +55,9 @@ year_METfile = {
 
 
 class TrigCorrProducer:
-    TauTRG_jsonPath = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/TAU/{}/tau.json.gz"
+    TauTRG_jsonPath = (
+        "/cvmfs/cms-griddata.cern.ch/cat/metadata/TAU/{}/latest/tau.json.gz"
+    )
     MuTRG_jsonPath = "Corrections/data/TRG/{0}/{1}"
     eTRG_jsonPath = "Corrections/data/TRG/{0}/{1}"
     mu_XTrg_jsonPath = "Corrections/data/TRG/{0}/{1}"
@@ -168,7 +170,9 @@ class TrigCorrProducer:
     }
 
     def __init__(self, period, config):
-        jsonFile_Tau = TrigCorrProducer.TauTRG_jsonPath.format(period)
+        jsonFile_Tau = TrigCorrProducer.TauTRG_jsonPath.format(
+            pog_folder_names["TAU"][period]
+        )
         self.deepTauVersion = f"""DeepTau{deepTauVersions[config["deepTauVersion"]]}v{config["deepTauVersion"]}"""
         jsonFile_e = os.path.join(
             os.environ["ANALYSIS_PATH"],

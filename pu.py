@@ -12,11 +12,14 @@ from .CorrectionsCore import *
 
 
 class puWeightProducer:
-    jsonPath = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/LUM/{}/puWeights.json.gz"
+    JsonPath = "/cvmfs/cms-griddata.cern.ch/cat/metadata/LUM/{folder}/latest/puWeights{suffix}.json.gz"
     initialized = False
 
     uncSource = ["pu"]
     golden_json_dict = {
+        "2025_Winter25": "",
+        "2025_Summer24": "",
+        "2024_Summer24": "Collisions24_BCDEFGHI_goldenJSON",
         "2023_Summer23BPix": "Collisions2023_369803_370790_eraD_GoldenJson",
         "2023_Summer23": "Collisions2023_366403_369802_eraBC_GoldenJson",
         "2022_Summer22EE": "Collisions2022_359022_362760_eraEFG_GoldenJson",
@@ -28,7 +31,10 @@ class puWeightProducer:
     }
 
     def __init__(self, period):
-        jsonFile = puWeightProducer.jsonPath.format(period)
+        suffix = "_BCDEFGHI" if period == "2024_Summer24" else ""  # tmp patch
+        jsonFile = puWeightProducer.JsonPath.format(
+            folder=pog_folder_names["LUM"][period], suffix=suffix
+        )
         if not puWeightProducer.initialized:
             headers_dir = os.path.dirname(os.path.abspath(__file__))
             header_path = os.path.join(headers_dir, "pu.h")
@@ -38,19 +44,33 @@ class puWeightProducer:
             )
             puWeightProducer.initialized = True
 
-    def getWeight(self, df, return_variations=True, isCentral=True):
+    def getWeight(
+        self,
+        df,
+        shape_weights_dict=None,
+        return_variations=True,
+        return_list_of_branches=False,
+        enabled=True,
+    ):
         sf_sources = puWeightProducer.uncSource if return_variations else []
-        weights = {}
+        branches = []
         for source in [central] + sf_sources:
             for scale in getScales(source):
-                if not isCentral and scale != central:
-                    continue
-                syst_name = getSystName(source, scale)
-                weights[syst_name] = []
-                df = df.Define(
-                    f"puWeight_{scale}",
-                    f"""::correction::puCorrProvider::getGlobal().getWeight(
-                                ::correction::UncScale::{scale}, Pileup_nTrueInt)""",
-                )
-                weights[syst_name].append(f"puWeight_{scale}")
-        return df, weights
+                branch_name = f"weight_pu_{scale}"
+                if enabled:
+                    df = df.Define(
+                        branch_name,
+                        f"""::correction::puCorrProvider::getGlobal().getWeight(
+                                    ::correction::UncScale::{scale}, Pileup_nTrueInt)""",
+                    )
+                    branches.append(branch_name)
+
+                key = (source, scale)
+                if shape_weights_dict:
+                    if key not in shape_weights_dict:
+                        shape_weights_dict[key] = []
+                    shape_weights_dict[key].append(branch_name)
+
+        if return_list_of_branches:
+            return df, branches
+        return df

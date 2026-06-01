@@ -3,6 +3,7 @@ import ROOT
 from .CorrectionsCore import *
 from FLAF.Common.Utilities import WorkingPointsbTag
 import yaml
+import json
 
 # https://twiki.cern.ch/twiki/bin/viewauth/CMS/BTagShapeCalibration
 # https://twiki.cern.ch/twiki/bin/view/CMS/BTagCalibration
@@ -31,7 +32,8 @@ def IsInJESList(src_name, jes_list):
 
 
 class bTagCorrProducer:
-    jsonPath = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/BTV/{}/btagging.json.gz"
+    jsonPath = "/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{}/latest/btagging.json.gz"
+    alternative_jsonPath = "/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{}/add_2025_b_and_c_WPs/btagging.json.gz"
     bTagEff_JsonPath = "Corrections/data/BTV/{}/btagEff.root"
     initialized = False
     uncSource_bTagWP = [
@@ -65,22 +67,35 @@ class bTagCorrProducer:
         "cferr2",
     ]
 
-    tagger_to_brag_branch = {"particleNet": "PNetB", "deepJet": "DeepFlavB"}
+    tagger_to_brag_branch = {
+        "particleNet": "PNetB",
+        "deepJet": "DeepFlavB",
+        "UParTAK4": "UParTAK4B",
+    }
 
+    # important note: From the 2024 campaign onwards, only the UParTAK4 tagger is supported, and only json files are provided.
     def __init__(
         self,
+        *,
         period,
-        bjet_preselection_branch,
+        jetCollection,
         loadEfficiency=False,
-        tagger_name="deepJet",
-        use_split_jes=False,
+        tagger="particleNet",
+        useSplitJes=False,
+        wantShape=False,
     ):
-        print(f"tagger_name={tagger_name}")
-        self.tagger_name = tagger_name
-        self.btag_branch = bTagCorrProducer.tagger_to_brag_branch[tagger_name]
-        self.bjet_preselection_branch = bjet_preselection_branch
-        self.use_split_jes = use_split_jes
-        jsonFile = bTagCorrProducer.jsonPath.format(period)
+        print(f"tagger={tagger}")
+        self.tagger = tagger
+        self.btag_branch = bTagCorrProducer.tagger_to_brag_branch[tagger]
+        self.jetCollection = jetCollection
+        self.useSplitJes = useSplitJes
+        jsonFile = bTagCorrProducer.jsonPath.format(
+            pog_folder_names["BTV"][period]
+        )  # for 2025 latest is not available, but files are in this folder available: add_2025_b_and_c_WPs (?) bah
+        if not os.path.exists(jsonFile):
+            jsonFile = bTagCorrProducer.alternative_jsonPath.format(
+                pog_folder_names["BTV"][period]
+            )
         jsonFile_eff = os.path.join(
             os.environ["ANALYSIS_PATH"],
             bTagCorrProducer.bTagEff_JsonPath.format(period),
@@ -91,18 +106,27 @@ class bTagCorrProducer:
             headers_dir = os.path.dirname(os.path.abspath(__file__))
             header_path = os.path.join(headers_dir, "btag.h")
             headershape_path = os.path.join(headers_dir, "btagShape.h")
-            ROOT.gInterpreter.Declare(f'#include "{header_path}"')
             ROOT.gInterpreter.Declare(f'#include "{headershape_path}"')
-            # ROOT.gInterpreter.ProcessLine(f'::correction::bTagCorrProvider::Initialize("{jsonFile}", "{jsonFile_eff}")')
-            # ROOT.gInterpreter.ProcessLine(f"""::correction::bTagShapeCorrProvider::Initialize("{jsonFile}", "{periods[period]}, "{self.tagger_name}")""")
-            ROOT.correction.bTagCorrProvider.Initialize(
-                jsonFile, jsonFile_eff, self.tagger_name
+            ROOT.gInterpreter.Declare(f'#include "{header_path}"')
+
+            ROOT.gInterpreter.ProcessLineSynch(
+                f'::correction::bTagCorrProvider::Initialize("{jsonFile}", "{jsonFile_eff}", "{self.tagger}")'
             )
+            # ROOT.correction.bTagCorrProvider.Initialize(
+            #     jsonFile, jsonFile_eff, self.tagger
+            # )
             ROOT.correction.bTagCorrProvider.getGlobal()
-            ROOT.correction.bTagShapeCorrProvider.Initialize(
-                jsonFile, periods[period], self.tagger_name
+            wantShape_str = "false"
+            if wantShape:
+                wantShape_str = "true"
+            ROOT.gInterpreter.ProcessLineSynch(
+                f"""::correction::bTagShapeCorrProvider::Initialize("{jsonFile}", "{periods[period]}", "{self.tagger}", {wantShape_str})"""
             )
+            # ROOT.correction.bTagShapeCorrProvider.Initialize(
+            #     jsonFile, periods[period], self.tagger
+            # )
             ROOT.correction.bTagShapeCorrProvider.getGlobal()
+
             bTagCorrProducer.initialized = True
 
     def getWPValues(self):
@@ -114,11 +138,11 @@ class bTagCorrProducer:
             )
         return wp_values
 
-    def getWPid(self, df):
-        wp_values = self.getWPValues()
+    def getWPid(self, df, jetCollection=None):
+        jetCollection = jetCollection or self.jetCollection
         df = df.Define(
-            f"Jet_idbtag{self.btag_branch}",
-            f"::correction::bTagCorrProvider::getGlobal().getWPBranch(Jet_btag{self.btag_branch})",
+            f"{jetCollection}_idbtag{self.btag_branch}",
+            f"::correction::bTagCorrProvider::getGlobal().getWPBranch({jetCollection}_btag{self.btag_branch})",
         )
         return df
 
@@ -139,10 +163,13 @@ class bTagCorrProducer:
                     # print(branch_name)
                     branch_central = f"""weight_bTagSF_{wp.name}_{source+central}"""
                     # branch_central = f"""weight_bTagSF_{wp.name}_{getSystName(central, central)}"""
+                    p4 = f"{self.jetCollection}_p4"
+                    hadronFlavour = f"{self.jetCollection}_hadronFlavour"
+                    btagScore = f"{self.jetCollection}_btag{self.btag_branch}"
                     df = df.Define(
                         f"{branch_name}_double",
                         f""" ::correction::bTagCorrProvider::getGlobal().getSF(
-                                Jet_p4, Jet_bCand, Jet_hadronFlavour, Jet_btag{self.btag_branch}, WorkingPointsbTag::{wp.name},
+                                {p4}, {hadronFlavour}, {btagScore}, WorkingPointsbTag::{wp.name},
                                 ::correction::bTagCorrProvider::UncSource::{source}, ::correction::UncScale::{scale}) """,
                     )
                     if scale != central:
@@ -170,12 +197,15 @@ class bTagCorrProducer:
         src_list = []
         scale_list = []
         force_name_as_central = False
-        # here list must be corrected
-        if isCentral and return_variations:
-            src_list = [central] + bTagCorrProducer.uncSources_bTagShape_norm
-            scale_list = [central] + sf_scales
 
-        if not isCentral:
+        # here list must be corrected
+        if isCentral:
+            src_list = [central]
+            scale_list = [central]
+            if return_variations:
+                src_list += bTagCorrProducer.uncSources_bTagShape_norm
+                scale_list += sf_scales
+        else:
             if IsInJESList(src_name, bTagCorrProducer.uncSources_bTagShape_jes):
                 src_list = [
                     f"jes{src_name}"
@@ -192,16 +222,24 @@ class bTagCorrProducer:
 
         for source in src_list:
             for scale in scale_list:
-                if source == central and scale != central:
+                if (source == central and scale != central) or (
+                    source != central and scale == central
+                ):
                     continue
-                syst_name = source + scale  # if source != central else 'Central'
+                syst_name = getSystName(
+                    source, scale
+                )  # if source != central else 'Central'
                 branch_name = f"weight_bTagShape_{syst_name}"
-                branch_central = f"""weight_bTagShape_{source+central}"""
+                branch_central = f"weight_bTagShape_{central}"
+
+                p4 = f"{self.jetCollection}_p4"
+                hadronFlavour = f"{self.jetCollection}_hadronFlavour"
+                btagScore = f"{self.jetCollection}_btag{self.btag_branch}"
 
                 df = df.Define(
                     f"{branch_name}_double",
                     f"""::correction::bTagShapeCorrProvider::getGlobal().getBTagShapeSF(
-                    Jet_p4, {self.bjet_preselection_branch}, Jet_hadronFlavour, Jet_btag{self.btag_branch},
+                    {p4}, {hadronFlavour}, {btagScore},
                     ::correction::bTagShapeCorrProvider::UncSource::{source},
                     ::correction::UncScale::{scale}
                     ) """,
@@ -227,3 +265,95 @@ class bTagCorrProducer:
                     )
                 SF_branches.append(branch_name_final)
         return df, SF_branches
+
+
+ROOT.gInterpreter.Declare(r"""
+#include <map>
+#include <string>
+
+struct BTagMapApplier {
+  std::map<std::string,float> corr;
+
+  float operator()(float w, const std::string &key) const {
+    auto it = corr.find(key);
+    const float r = (it != corr.end()) ? it->second : 1.0;
+    return w * r;
+  }
+};
+""")
+
+
+class btagShapeWeightCorrector:
+    def __init__(self, *, norm_file_path, bins):
+        self.norm_file_path = norm_file_path
+        with open(norm_file_path, "r") as norm_file:
+            self.shape_weight_corr_dict = json.load(norm_file)
+        self.bins = bins
+        self._appliers = []
+
+    def _define_key_column(self, df, keycol, syst):
+        # key = norm_<syst>_<bin_name>
+        pieces = []
+        for bin_name, cut in self.bins.items():
+            pieces.append(f'({cut}) ? std::string("norm_{syst}_{bin_name}") : ')
+        key_expr = "".join(pieces) + 'std::string("__default__")'
+
+        cols = set(df.GetColumnNames())
+        return (
+            df.Redefine(keycol, key_expr)
+            if keycol in cols
+            else df.Define(keycol, key_expr)
+        )
+
+    def UpdateBtagWeight(self, *, df, unc_src, unc_scale, sf_branches):
+        unc_src_scale = f"{unc_src}_{unc_scale}" if unc_src != unc_scale else unc_src
+        if unc_src_scale not in self.shape_weight_corr_dict:
+            raise KeyError(
+                f"Key `{unc_src_scale}` not found in `{self.norm_file_path}`."
+            )
+
+        # btag branches have format weight_bTagShape_{syst}_rel
+        # need to extract syst => need token #2
+        systs = [b.split("_")[2] for b in sf_branches]
+
+        applier = ROOT.BTagMapApplier()
+        applier.corr["__default__"] = 1.0
+        for k, v in self.shape_weight_corr_dict[unc_src_scale].items():
+            applier.corr[k] = float(v)
+        self._appliers.append(applier)
+
+        # only correct weights for uncertainty variations
+        # branches are defined as relative, i.e. branch/central
+        # to correct, need to first multiply by central
+        # after this loop _rel branches will have the full value
+        # => will have to divide them by central after it is corrected
+        for syst in systs:
+            if syst == "Central":
+                continue
+            keycol = f"btag_shape_norm_key_{syst}"
+            df = self._define_key_column(df, keycol, syst)
+
+            branch_name = f"weight_bTagShape_{syst}_rel"
+            # rel := rel * central * corr(norm_<syst>_<bin>)
+            df = df.Redefine(
+                branch_name, f"(float){branch_name} * weight_bTagShape_Central"
+            ).Redefine(branch_name, applier, [branch_name, keycol])
+
+        # correct central separately after everything else was corrected and central is not needed
+        df = self._define_key_column(df, "btag_shape_norm_key_Central", "Central")
+        df = df.Redefine(
+            "weight_bTagShape_Central",
+            applier,
+            ["weight_bTagShape_Central", "btag_shape_norm_key_Central"],
+        )
+
+        # redefine all _rel branches by dividing them by updated Central to make them contain relative value
+        for syst in systs:
+            if syst == "Central":
+                continue
+            branch_name = f"weight_bTagShape_{syst}_rel"
+            df = df.Redefine(
+                branch_name, f"(float){branch_name} / weight_bTagShape_Central"
+            )
+
+        return df

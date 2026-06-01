@@ -3,7 +3,7 @@
 #include <set>
 #include <map>
 
-#include <boost/json/src.hpp>
+#include <boost/json.hpp>
 #include "corrections.h"
 
 class LumiFilter : public correction::CorrectionsBase<LumiFilter> {
@@ -17,7 +17,7 @@ class LumiFilter : public correction::CorrectionsBase<LumiFilter> {
     static boost::json::value ParseFile(const std::string& jsonFile) {
         std::ifstream f(jsonFile);
         const std::string input((std::istreambuf_iterator<char>(f)), {});
-        boost::json::error_code ec;
+        boost::system::error_code ec;
         const auto lumiJson = boost::json::parse(input, ec);
         if (ec)
             throw std::invalid_argument("LumiFilter: Invalid lumi json file = '" + jsonFile +

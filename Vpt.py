@@ -31,11 +31,9 @@ scale_defs = {
 
 
 class VptCorrProducer:
-    EWK_corr_jsonPath_recoil = (
-        "Corrections/data/DYWeightHLepRare/DY_pTll_recoil_corrections_{0}_v3.json.gz"
-    )
+    EWK_corr_jsonPath_recoil = "Corrections/data/hleprare/DYandRecoilCorrlib/DY_pTll_recoil_corrections_{0}_v5.json.gz"
     EWK_corr_jsonPath_weights = (
-        "Corrections/data/DYWeightHLepRare/DY_pTll_weights_{0}_v3.json.gz"
+        "Corrections/data/hleprare/DYweightCorrlib/DY_pTll_weights_{0}_v5.json.gz"
     )
     EWK_corr_filePath = "Corrections/data/EWK_Corr_Vpt/{0}"
     initialized = False
@@ -98,7 +96,6 @@ class VptCorrProducer:
                             f"""::correction::VptCorrProvider::getGlobal().getDY_weight(LHE_Vpt, "{self.order}",
                                         ::correction::VptCorrProvider::UncSource::{source}, ::correction::VptCorrProvider::DYUncScale::{scale_def} )""",
                         )
-                        # print(df.Count().GetValue())
                         # for scale_def in scale_defs[order][scale]:
                         # print(scale_def)
                         # df = df.Define(f"{branch_SF_name}_weightCorrLib_double", f"""weightCorrLib_map_{scale}.at("{scale_def}")""")

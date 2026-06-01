@@ -17,4 +17,6 @@ class LumiFilter:
             LumiFilter.initialized = True
 
     def filter(self, df):
-        return df.Filter("LumiFilter::getGlobal().Pass(run, luminosityBlock)")
+        return df.Filter(
+            "LumiFilter::getGlobal().Pass(run, luminosityBlock)", "LumiFilter"
+        )

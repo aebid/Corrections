@@ -48,11 +48,12 @@ jsonfileversion = "2025-10-01"
 
 class TauCorrProducer:
     jsonPath = (
-        "/cvmfs/cms-griddata.cern.ch/cat/metadata/TAU/{}/"
-        + jsonfileversion
-        + "/tau_DeepTau2018v2p5_{}.json.gz"
+        #     "/cvmfs/cms-griddata.cern.ch/cat/metadata/TAU/{}/latest/"
+        #     + jsonfileversion
+        #     + "/tau_DeepTau2018v2p5_{}.json.gz"
+        # )
+        "/cvmfs/cms-griddata.cern.ch/cat/metadata/TAU/{}/latest/tau.json.gz"
     )
-
     initialized = False
 
     energyScaleSources_tau = ["TauES_DM0", "TauES_DM1", "TauES_3prong"]
@@ -94,11 +95,21 @@ class TauCorrProducer:
         "genuineMuon_etaGt1p7",
     ]
 
-    def __init__(self, period, config):
+    inputColumns = [
+        "legType",
+        "p4",
+        "gen_kind",
+        "decayMode",
+        "channelId",
+    ]
+
+    def __init__(self, *, period, config, columns):
         self.deepTauVersion = f"""DeepTau{deepTauVersions[config["deepTauVersion"]]}v{config["deepTauVersion"]}"""
         jsonFile = TauCorrProducer.jsonPath.format(
-            period_in_taupog_folder[period], period_in_tau_file_name[period]
+            pog_folder_names["TAU"][period_names[period]]
         )
+        #     period_in_taupog_folder[period], period_in_tau_file_name[period]
+        # )
         if not TauCorrProducer.initialized:
             headers_dir = os.path.dirname(os.path.abspath(__file__))
             header_path = os.path.join(headers_dir, "tau.h")
@@ -109,6 +120,9 @@ class TauCorrProducer:
                 f'::correction::TauCorrProvider::Initialize("{jsonFile}", "{self.deepTauVersion}", {wp_map_cpp}, {tauType_map} , "{period_in_tau_json[period]}")'
             )
             TauCorrProducer.initialized = True
+        self.columns = {}
+        for col in TauCorrProducer.inputColumns:
+            self.columns[col] = columns.get(col, col)
 
     def getES(self, df, source_dict):
         for source in (
@@ -151,12 +165,23 @@ class TauCorrProducer:
                     branch_Medium_central = (
                         f"""weight_{leg_name}_TauID_SF_Medium_{source}Central"""
                     )
+
+                    gen_kind = f"{leg_name}_{self.columns['gen_kind']}"
+                    legType = f'{leg_name}_{self.columns["legType"]}'
+                    decayMode = f'{leg_name}_{self.columns["decayMode"]}'
+                    p4 = f'{leg_name}_{self.columns["p4"]}'
+
+                    legType = getLegTypeString(df, legType)
+                    channelId = getChannelIdString(df, self.columns["channelId"])
+
                     df = df.Define(
                         f"{branch_Medium_name}_double",
-                        f"""HttCandidate.leg_type[{leg_idx}] == Leg::tau ? ::correction::TauCorrProvider::getGlobal().getSF(
-                               HttCandidate.leg_p4[{leg_idx}], Tau_decayMode.at(HttCandidate.leg_index[{leg_idx}]),
-                               Tau_genMatch.at(HttCandidate.leg_index[{leg_idx}]),"Medium", HttCandidate.channel(),
-                               ::correction::TauCorrProvider::UncSource::{source}, ::correction::UncScale::{scale}) : 1.;""",
+                        f"""{legType} == Leg::tau
+                            ? ::correction::TauCorrProvider::getGlobal().getSF(
+                                {p4}, {decayMode}, {gen_kind}, "Medium", {channelId},
+                                ::correction::TauCorrProvider::UncSource::{source},
+                                ::correction::UncScale::{scale})
+                            : 1.""",
                     )
                     if scale != central:
                         branch_name_Medium_final = branch_Medium_name + "_rel"
