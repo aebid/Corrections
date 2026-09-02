@@ -184,6 +184,7 @@ class Corrections:
         self.btag_ = None
         self.pu_ = None
         self.parton_shower_ = None
+        self.pdf_ = None
         self.dy_hhbbtautau_ = None
         self.dy_hhbbww_ = None
         self.mu_ = None
@@ -225,6 +226,20 @@ class Corrections:
                 branch=self.to_apply.get("parton_shower", {}).get("branch", "PSWeight")
             )
         return self.parton_shower_
+
+    @property
+    def pdf(self):
+        if self.pdf_ is None:
+            from .pdf import pdfWeightProducer
+
+            cfg = self.to_apply.get("pdf", {})
+            self.pdf_ = pdfWeightProducer(
+                branch=cfg.get("branch", "LHEPdfWeight"),
+                mode=cfg.get("mode", "replicas"),
+                first=cfg.get("first", 1),
+                n=cfg.get("n", 100),
+            )
+        return self.pdf_
 
     @property
     def dy_hhbbtautau(self):
@@ -543,13 +558,19 @@ class Corrections:
     shape_weight_producers = [
         ("pu", "pu"),  # (correction name in global.yaml, attribute on self)
         ("parton_shower", "parton_shower"),
+        ("pdf", "pdf"),
     ]
 
     def _shapeWeightClasses(self):
         from .pu import puWeightProducer
         from .parton_shower import psWeightProducer
+        from .pdf import pdfWeightProducer
 
-        return {"pu": puWeightProducer, "parton_shower": psWeightProducer}
+        return {
+            "pu": puWeightProducer,
+            "parton_shower": psWeightProducer,
+            "pdf": pdfWeightProducer,
+        }
 
     def registerShapeWeights(self, registry, return_variations=True):
         """Populate a ShapeWeightRegistry with the shape producers active here.
