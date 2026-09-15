@@ -5,9 +5,6 @@ import ROOT
 
 from .CorrectionsCore import *
 
-# Reduction modes understood by ::correction::pdfRelUnc. Names, not bare integers, are
-# what appears in global.yaml -- a config that reads `mode: hessian` is checkable by
-# eye, `mode: 1` is not.
 PDF_MODES = {
     "replicas": 0,
     "hessian": 1,
@@ -15,35 +12,11 @@ PDF_MODES = {
 
 
 class pdfWeightProducer:
-    """PDF acceptance variations from the NanoAOD LHEPdfWeight vector.
+    """PDF acceptance variations from the NanoAOD LHEPdfWeight vector, as a shape weight.
 
-    ~100 PDF members are reduced to a single symmetric Up/Down pair, because the shape
-    framework has no representation for an N-member family: CorrectionsCore.getScales
-    returns [Up, Down] for every non-central source, and the anaCache denominators are
-    nested source -> scale -> processor to match. The reduction is done per event, in
-    ::correction::pdfRelUnc, giving a relative spread r, and the weights are 1 +/- r.
-
-    What that is, precisely: this is NOT PDF4LHC15 section 6 applied to the binned
-    observable. The prescription takes the spread across members *of each bin content*;
-    this takes it per event and then sums magnitudes within a bin, which implicitly
-    treats bins as fully correlated. After the shape-only normalisation it captures how
-    the variation magnitude trends against the observable, but misses genuinely
-    anti-correlated bin migrations. The size of that approximation is meant to be
-    bounded once, offline, by filling the member histograms directly for one process and
-    comparing the per-bin spread against what this produces.
-
-    As for the parton shower, the weights are already w_var / w_nominal, so there is no
-    correction to apply centrally -- the nominal sample *is* the nominal PDF member.
-    `weight_pdf_Central` is therefore the literal 1.f, which is also what keeps the
-    existing pileup and parton-shower denominators bit-identical when this producer is
-    added. What makes the nuisance shape-only is the anaCache denominator: each
-    variation is divided by its own inclusive sum of weights in Corrections' `base`
-    block, so the inclusive yield is unchanged and only acceptance survives. That is
-    exactly complementary to the PDF_alphas lnN in the datacards, which carries the
-    rate -- the two do not double count.
-
-    See pdf.h for why the reduction mode must come from config rather than from the
-    length of the vector.
+    The members are reduced per event to a relative spread r (see pdf.h), and
+    (Down, Central, Up) = (1 - r, 1, 1 + r). This approximates PDF4LHC15, which takes
+    the spread per bin.
     """
 
     initialized = False
@@ -53,10 +26,7 @@ class pdfWeightProducer:
     warned_missing = set()
 
     def __init__(self, branch="LHEPdfWeight", mode="replicas", first=1, n=100):
-        # LHEPdfWeight, not LHEPdf_Weight. The anaCache denominator is accumulated in
-        # anaTupleProducer.updateDenomEntry, which runs before addAllVariables defines
-        # the renamed LHEPdf_Weight column, so only the original NanoAOD name is
-        # available at that point. This is the same trap documented in parton_shower.py.
+        # The NanoAOD name: the denominator is summed before anaTupleDef renames it.
         self.branch = branch
         if mode not in PDF_MODES:
             raise RuntimeError(
@@ -82,12 +52,6 @@ class pdfWeightProducer:
         return f"weight_pdf_{getSystName(source, scale)}"
 
     def relUncBranchName(self):
-        """Intermediate column holding the per-event relative spread.
-
-        Defined once and used by both Up and Down, so the ~100-member reduction runs
-        once per event rather than twice. It is never appended to colToSave, so it does
-        not reach the tuple.
-        """
         return "pdf_rel_unc"
 
     def getWeight(
@@ -105,11 +69,6 @@ class pdfWeightProducer:
             columns = {str(c) for c in df.GetColumnNames()}
             has_input = self.branch in columns
             if not has_input:
-                # A stage where the branch has been renamed away (AnaTupleMerge holds
-                # LHEPdf_Weight, not LHEPdfWeight) must not silently define 1.f on top
-                # of the correct values already persisted -- that would shadow them and
-                # make the nuisance null with nothing to show for it. The producer is
-                # meant to be disabled there via `enabled` in global.yaml.
                 already_built = any(c.startswith("weight_pdf_") for c in columns)
                 if already_built:
                     raise RuntimeError(
@@ -137,9 +96,6 @@ class pdfWeightProducer:
                 branch_name = pdfWeightProducer.branchName(source, scale)
                 if enabled:
                     if source == central:
-                        # Exactly 1.0f, so adding this producer leaves the pileup and
-                        # parton-shower denominators bit-identical: multiplying by an
-                        # IEEE-754 1.0f is the identity.
                         expr = "1.f"
                     elif has_input:
                         sign = "+" if scale == up else "-"
