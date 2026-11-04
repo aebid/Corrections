@@ -12,6 +12,10 @@ class pdfWeightProducer:
     of the `pdf` source and therefore gets its own anaCache denominator and its own
     weight_base_pdf<k>_rel, the same way pileup gets one per Up/Down.
 
+    How CMS applies the PDF and QCD-scale uncertainties: "CMS theory uncertainties",
+    Physics Days,
+    https://indico.cern.ch/event/1685006/contributions/7200117/attachments/3339004/5983688/CMS%20theory%20uncertainties%20Physics%20Days.pdf
+
     Member 0 is the Central branch, the way the nominal pileup weight is: it multiplies
     into weight_base and into the Central denominator, so the nominal is reweighted onto
     the stored set's central PDF with the sample's total normalisation preserved -- only
