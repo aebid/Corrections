@@ -67,15 +67,15 @@ namespace correction {
                 static const std::vector<std::string> WpNames = {"Loose", "Medium", "Tight"};
                 static const std::vector<int> Flavours = {0, 4, 5};
                 for (const auto& flav : Flavours) {
-                    auto denum =
-                        root_ext::ReadCloneObject<TH2>(*efficiencyFile, "jet_pt_eta_" + std::to_string(flav), "", true);
+                    std::unique_ptr<TH2> denum(root_ext::ReadCloneObject<TH2>(
+                        *efficiencyFile, "jet_pt_eta_" + std::to_string(flav), "", true));
                     for (const auto& wp_entry : getWPNames()) {
                         auto num = root_ext::ReadCloneObject<TH2>(
                             *efficiencyFile,
                             "jet_pt_eta_" + std::to_string(flav) + "_" + wp_entry.second.second,
                             "",
                             true);
-                        num->Divide(denum);
+                        num->Divide(denum.get());
                         histMapEfficiency[std::make_pair(wp_entry.first, flav)] = std::shared_ptr<TH2>(num);
                     }
                 }
