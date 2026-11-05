@@ -19,8 +19,6 @@ from .CorrectionsCore import *
 
 
 class JetCorrProducer:
-    jsonPath_btag = "/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{}/btagging.json.gz"
-
     jet_algorithm = "AK4PFPuppi"
     fatjet_algorithm = "AK8PFPuppi"
 
