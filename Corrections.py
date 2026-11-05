@@ -158,7 +158,9 @@ class Corrections:
 
         # A producer whose variations are not Up/Down declares its scales here, before
         # anything enumerates them: the anaCache merge reads the denominator grid before
-        # a single weight is defined.
+        # a single weight is defined. Every configured one is registered, also at a stage
+        # that does not list it, so that the histogram stages see its scales too.
+        self.registerConfiguredSourceScales(self.global_params)
         shape_weight_classes = self._shapeWeightClasses()
         for corr_name, (_, cfg) in self.shape_weights.items():
             cls = shape_weight_classes[corr_name]
@@ -610,7 +612,8 @@ class Corrections:
         ("qcd_scale", "qcd_scale"),
     ]
 
-    def _shapeWeightClasses(self):
+    @staticmethod
+    def _shapeWeightClasses():
         from .pu import puWeightProducer
         from .parton_shower import psWeightProducer
         from .top_pt import TopPtCorrProducer
@@ -624,6 +627,25 @@ class Corrections:
             "pdf": pdfWeightProducer,
             "qcd_scale": qcdScaleWeightProducer,
         }
+
+    @classmethod
+    def registerConfiguredSourceScales(cls, global_params):
+        """Register the scales of every configured shape weight whose variations are an
+        indexed family (the PDF members, the QCD-scale points), whatever the stage.
+
+        A Corrections instance registers only the shape weights of its own stage, and the
+        histogram stages either build one at a stage where these weights are not listed
+        (HistTuple) or build none (HistFromNtuple, HistMerger). There `getScales("pdf")`
+        would fall back to Up/Down. Calling this with the global parameters makes every
+        stage see the same scales as AnaTuple, where the weights were made.
+        """
+        classes = cls._shapeWeightClasses()
+        for corr_name, cfg in (global_params.get("corrections") or {}).items():
+            producer = classes.get(corr_name)
+            if producer is None or not hasattr(producer, "scales"):
+                continue
+            for source in producer.uncSource:
+                registerSourceScales(source, producer.scales(cfg or {}))
 
     def registerShapeWeights(self, registry, return_variations=True):
         """Populate a ShapeWeightRegistry with the shape weights of this stage.
