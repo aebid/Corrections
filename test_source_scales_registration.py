@@ -9,7 +9,11 @@ import os
 import sys
 import unittest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Import the package from the directory above: run from here, the script's own directory would
+# make `Corrections` resolve to Corrections.py (this directory has no __init__.py).
+repo = os.path.dirname(os.path.abspath(__file__))
+sys.path = [p for p in sys.path if os.path.abspath(p or ".") != repo]
+sys.path.insert(0, os.path.dirname(repo))
 
 from Corrections import CorrectionsCore  # noqa: E402
 from Corrections.Corrections import Corrections  # noqa: E402
