@@ -11,6 +11,10 @@ class qcdScaleWeightProducer:
     its own weight_base_qcd_scale_muR<r>_muF<f>_rel, and which of them form the envelope is
     decided later, per bin. Being shape-only, they complement the QCD_scale_* rate lnN.
 
+    How CMS applies the QCD-scale and PDF uncertainties: "CMS theory uncertainties",
+    Physics Days,
+    https://indico.cern.ch/event/1685006/contributions/7200117/attachments/3339004/5983688/CMS%20theory%20uncertainties%20Physics%20Days.pdf
+
     The scale is the (muR, muF) pair the entry stands for, not its position in the vector,
     so the branch says what it varies. `0p5` spells 0.5 because a column name cannot carry
     a dot, and no label ends in Up or Down, which splitSystName would cut at.
