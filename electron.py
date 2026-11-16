@@ -101,6 +101,8 @@ class EleCorrProducer:
     EleID_JsonPath = "/cvmfs/cms-griddata.cern.ch/cat/metadata/EGM/{folderName}/latest/{filenameID}.json.gz"
     EleES_JsonPath_Run3 = "/cvmfs/cms-griddata.cern.ch/cat/metadata/EGM/{folderName}/latest/{filenameES}.json.gz"
     ID_sources = ["EleID"]
+    Reco_source = "EleReco"
+    reco_working_point = "Reco"
     working_points = ["wp80iso", "wp80noiso"]
     energyScaleSources_ele = ["EleES", "EleSmear"]
 
@@ -110,8 +112,10 @@ class EleCorrProducer:
         "p4",
     ]
 
-    def __init__(self, *, campaign, columns, isData=False):
+    def __init__(self, *, campaign, columns, isData=False, reco_sf=False):
         self.isData = isData
+        # EGM reconstruction-efficiency SFs (Reco* working points of Electron-ID-SF), opt-in
+        self.reco_sf = reco_sf
         file_nameID = ele_files_names[campaign]["eleID"]
         file_nameES = (
             ele_files_names[campaign]["eleES"]
@@ -175,55 +179,75 @@ class EleCorrProducer:
         return df, source_dict
 
     def getIDSF(self, df, lepton_legs, isCentral, return_variations):
-        sf_sources = EleCorrProducer.ID_sources
+        provider = self.provider.ref
+        # (working point label, source, C++ call evaluating the SF of one leg)
+        sf_defs = [
+            (
+                working_point,
+                source,
+                lambda p4, source, scale, wp=working_point: f"""{provider}->getID_SF(
+                    {p4}, "{wp}", "{self.year}",
+                    ::correction::EleCorrProvider::UncSource::{source},
+                    ::correction::UncScale::{scale})""",
+            )
+            for working_point in EleCorrProducer.working_points
+            for source in EleCorrProducer.ID_sources
+        ]
+        if self.reco_sf:
+            # the Reco working point is chosen by the electron pT in getReco_SF
+            sf_defs.append(
+                (
+                    EleCorrProducer.reco_working_point,
+                    EleCorrProducer.Reco_source,
+                    lambda p4, source, scale: f"""{provider}->getReco_SF(
+                    {p4}, "{self.year}",
+                    ::correction::EleCorrProvider::UncSource::{source},
+                    ::correction::UncScale::{scale})""",
+                )
+            )
         SF_branches = []
         sf_scales = [up, down] if return_variations else []
-        for working_point in EleCorrProducer.working_points:
-            for source in sf_sources:
-                for scale in [central] + sf_scales:
-                    if not isCentral and scale != central:
-                        continue
-                    # syst_name = getSystName(source, scale)
-                    for leg_name in lepton_legs:
-                        branch_name = (
-                            f"weight_{leg_name}_EleSF_{working_point}_{source+scale}"
-                        )
-                        branch_central = f"""weight_{leg_name}_EleSF_{working_point}_{source+central}"""
+        for working_point, source, sf_call in sf_defs:
+            for scale in [central] + sf_scales:
+                if not isCentral and scale != central:
+                    continue
+                for leg_name in lepton_legs:
+                    branch_name = (
+                        f"weight_{leg_name}_EleSF_{working_point}_{source+scale}"
+                    )
+                    branch_central = (
+                        f"weight_{leg_name}_EleSF_{working_point}_{source+central}"
+                    )
 
-                        gen_kind = f"{leg_name}_{self.columns['gen_kind']}"
-                        legType = f'{leg_name}_{self.columns["legType"]}'
-                        p4 = f'{leg_name}_{self.columns["p4"]}'
+                    gen_kind = f"{leg_name}_{self.columns['gen_kind']}"
+                    legType = f'{leg_name}_{self.columns["legType"]}'
+                    p4 = f'{leg_name}_{self.columns["p4"]}'
 
-                        genMatch_bool = f"{gen_kind} == 1 || {gen_kind} == 3"
-                        legType = getLegTypeString(df, legType)
+                    genMatch_bool = f"{gen_kind} == 1 || {gen_kind} == 3"
+                    legType = getLegTypeString(df, legType)
 
-                        df = df.Define(
-                            f"{branch_name}_double",
-                            f"""{legType} == Leg::e && {p4}.pt() >= 10 && ({genMatch_bool})
-                                ? {self.provider.ref}->getID_SF(
-                                    {p4}, "{working_point}", "{self.year}",
-                                    ::correction::EleCorrProvider::UncSource::{source},
-                                    ::correction::UncScale::{scale})
+                    df = df.Define(
+                        f"{branch_name}_double",
+                        f"""{legType} == Leg::e && {p4}.pt() >= 10 && ({genMatch_bool})
+                                ? {sf_call(p4, source, scale)}
                                 : 1.""",
+                    )
+
+                    if scale != central:
+                        branch_name_final = branch_name + "_rel"
+                        df = df.Define(
+                            branch_name_final,
+                            f"static_cast<float>({branch_name}_double/{branch_central})",
+                        )
+                    else:
+                        if source == central:
+                            branch_name_final = f"""weight_{leg_name}_EleSF_{central}"""
+                        else:
+                            branch_name_final = branch_name
+                        df = df.Define(
+                            branch_name_final,
+                            f"static_cast<float>({branch_name}_double)",
                         )
 
-                        if scale != central:
-                            branch_name_final = branch_name + "_rel"
-                            df = df.Define(
-                                branch_name_final,
-                                f"static_cast<float>({branch_name}_double/{branch_central})",
-                            )
-                        else:
-                            if source == central:
-                                branch_name_final = (
-                                    f"""weight_{leg_name}_EleSF_{central}"""
-                                )
-                            else:
-                                branch_name_final = branch_name
-                            df = df.Define(
-                                branch_name_final,
-                                f"static_cast<float>({branch_name}_double)",
-                            )
-
-                        SF_branches.append(branch_name_final)
+                    SF_branches.append(branch_name_final)
         return df, SF_branches
