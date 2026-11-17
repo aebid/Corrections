@@ -107,10 +107,7 @@ namespace correction {
             return "RecoAbove75";
         }
 
-        float getReco_SF(const LorentzVectorM& Electron_p4,
-                         std::string year,
-                         UncSource source,
-                         UncScale scale) const {
+        float getReco_SF(const LorentzVectorM& Electron_p4, std::string year, UncSource source, UncScale scale) const {
             return getID_SF(Electron_p4, recoWorkingPoint(Electron_p4.pt()), year, source, scale);
         }
         // https://gitlab.cern.ch/cms-analysis-corrections/EGM/examples/-/blob/latest/egmScaleAndSmearingExample.py?ref_type=heads
