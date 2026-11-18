@@ -36,6 +36,7 @@ namespace correction {
             EleES = 1,
             Ele_dEsigma = 2,
             EleSmear = 3,
+            EleReco = 4,
         };
 
         static std::string getESScaleStr(UncScale scale) {
@@ -57,6 +58,8 @@ namespace correction {
 
         static bool sourceApplies(UncSource source) {
             if (source == UncSource::EleID)
+                return true;
+            if (source == UncSource::EleReco)
                 return true;
             if (source == UncSource::EleES)
                 return true;
@@ -92,6 +95,20 @@ namespace correction {
                     EleIDSF_, year, getIDScaleStr(jet_scale), working_point, Electron_p4.eta(), Electron_p4.pt());
             }
             return value;
+        }
+
+        // EGM reconstruction-efficiency SFs are working points of the same Electron-ID-SF
+        // correction, one per electron pT range.
+        static std::string recoWorkingPoint(double pt) {
+            if (pt < 20.)
+                return "RecoBelow20";
+            if (pt < 75.)
+                return "Reco20to75";
+            return "RecoAbove75";
+        }
+
+        float getReco_SF(const LorentzVectorM& Electron_p4, std::string year, UncSource source, UncScale scale) const {
+            return getID_SF(Electron_p4, recoWorkingPoint(Electron_p4.pt()), year, source, scale);
         }
         // https://gitlab.cern.ch/cms-analysis-corrections/EGM/examples/-/blob/latest/egmScaleAndSmearingExample.py?ref_type=heads
         // Data gets the energy-scale correction, MC the smearing; the scale and smearing

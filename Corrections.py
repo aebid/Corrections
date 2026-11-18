@@ -445,6 +445,7 @@ class Corrections:
                 campaign=campaign_names[self.era],
                 columns=self.to_apply.get("ele", {}).get("columns", {}),
                 isData=self.isData,
+                reco_sf=self.to_apply.get("ele", {}).get("reco_sf", False),
             )
         return self.ele_
 
