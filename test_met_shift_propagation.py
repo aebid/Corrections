@@ -36,7 +36,8 @@ OBJECTS = {"Electron": (35.0, 2), "Muon": (28.0, 1), "Tau": (45.0, 2), "Jet": (6
 SOURCES = {
     "EleES": ["Electron"],
     "TauES_DM0": ["Tau"],
-    "ScaRe": ["Muon"],
+    "MuScale": ["Muon"],
+    "MuRes": ["Muon"],
     "JES_Total": ["Jet", "FatJet"],
     "FatJetOnly": ["FatJet"],
 }

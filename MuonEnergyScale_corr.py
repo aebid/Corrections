@@ -9,7 +9,7 @@ class MuonEnergyScaleProducer:
     # jsonPath = "/cvmfs/cms-griddata.cern.ch/cat/metadata/MUO/{}/latest/muon_scalesmearing.json.gz"
     jsonPath_VXBS = "Corrections/data/MUO/MuonScaRe/{}/muon_scalesmearing_VXBS.json.gz"  # tmp patch because currently VXBS ScaRe are copied from /afs/cern.ch/user/f/ferrico/cmsonly/JSON_VXBS/
     jsonPath = "Corrections/data/MUO/MuonScaRe/{}/muon_scalesmearing.json.gz"  # tmp patch because currently VXBS ScaRe are copied from /afs/cern.ch/user/f/ferrico/cmsonly/JSON/
-    uncSources = ["ScaRe"]
+    uncSources = ["MuScale", "MuRes"]
 
     def __init__(
         self,

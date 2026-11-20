@@ -9,9 +9,12 @@ namespace correction {
 
     class MuonScaReCorrProvider {
       public:
+        // The two uncertainties of the MUO scale-and-resolution correction, as in the MUO recipe: the
+        // statistical uncertainty of the scale correction and that of the MC smearing factor k.
         enum class UncSource : int {
             Central = -1,
-            ScaRe = 0,
+            MuScale = 0,
+            MuRes = 1,
         };
         static const std::string& getScaleStr(UncScale scale) {
             static const std::map<UncScale, std::string> names = {
@@ -23,9 +26,7 @@ namespace correction {
         }
 
         static bool sourceApplies(UncSource source) {
-            if (source == UncSource::ScaRe)
-                return true;
-            return false;
+            return source == UncSource::MuScale || source == UncSource::MuRes;
         }
 
         MuonScaReCorrProvider(const std::string& jsonFile, const std::string& jsonFileVXBS)
@@ -45,25 +46,25 @@ namespace correction {
                              UncSource source,
                              UncScale scale,
                              bool useVXBS = false) const {
-            const UncScale mu_scale = sourceApplies(source) ? scale : UncScale::Central;
-            const std::string& scale_str = getScaleStr(mu_scale);
+            // Nominal, data and MC: the scale correction; MC only: then the smearing.
+            const double pt_scaled = pt_scale(is_data, Muon_pt, Muon_eta, Muon_phi, Muon_charge, useVXBS);
+            const double pt_nominal =
+                is_data ? pt_scaled
+                        : pt_resol(pt_scaled, Muon_eta, Muon_phi, Muon_nTrackerLayers, evtNumber, lumiNumber, useVXBS);
 
-            const int isData = is_data ? 1 : 0;
-            const double muon_pt_scaled =
-                mu_scale == UncScale::Central
-                    ? pt_scale(is_data, Muon_pt, Muon_eta, Muon_phi, Muon_charge, useVXBS)
-                    : pt_scale_var(Muon_pt, Muon_eta, Muon_phi, Muon_charge, scale_str, useVXBS);
-            double muon_pt_resol = muon_pt_scaled;
-
-            if (!isData) {
-                muon_pt_resol =
-                    mu_scale == UncScale::Central
-                        ? pt_resol(
-                              muon_pt_scaled, Muon_eta, Muon_phi, Muon_nTrackerLayers, evtNumber, lumiNumber, useVXBS)
-                        : pt_resol_var(muon_pt_scaled, muon_pt_resol, Muon_eta, scale_str, useVXBS);
+            // Variations (MC only) are taken around the nominal corrected muon, as in the MUO recipe:
+            // the scale uncertainty shifts the fully corrected pT, the resolution uncertainty rescales
+            // the smearing that was applied (k -> k +- k_unc) for the same random number. Varying the
+            // uncorrected pT instead drops the nominal corrections from both Up and Down.
+            double pt_out = pt_nominal;
+            if (!is_data && sourceApplies(source) && scale != UncScale::Central) {
+                const std::string& updn = getScaleStr(scale);
+                if (source == UncSource::MuScale)
+                    pt_out = pt_scale_var(pt_nominal, Muon_eta, Muon_phi, Muon_charge, updn, useVXBS);
+                else
+                    pt_out = pt_resol_var(pt_scaled, pt_nominal, Muon_eta, updn, useVXBS);
             }
-            const LorentzVectorM muon_p4_ScaRe = LorentzVectorM(muon_pt_resol, Muon_eta, Muon_phi, Muon_mass);
-            return muon_p4_ScaRe;
+            return LorentzVectorM(pt_out, Muon_eta, Muon_phi, Muon_mass);
         }
         RVecLV getES(const RVecI& id_selection,
                      const RVecF& Muon_pt,
